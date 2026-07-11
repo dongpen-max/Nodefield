@@ -1,0 +1,101 @@
+{
+  "name": "nodefield",
+  "title": "Nodefield",
+  "description": "A local-first infinite canvas for turning notes, sources, insights, and tasks into a connected visual knowledge field.",
+  "promise": "Turn scattered notes, sources, and next actions into a connected visual field that stays on your device and exports cleanly.",
+  "target_users": [
+    "Solo researchers",
+    "Product managers and strategists",
+    "Writers and independent creators"
+  ],
+  "workflows": [
+    "Capture a typed card directly on the canvas.",
+    "Connect cards to express evidence, inference, and next actions.",
+    "Edit selected card details without leaving spatial context.",
+    "Search and focus a card in a large board.",
+    "Import, export, and recover a board without an account."
+  ],
+  "success_criteria": [
+    "Users can create, edit, connect, move, duplicate, and delete cards.",
+    "Board data and viewport survive a full reload.",
+    "Native JSON and JSON Canvas files validate before replacing current data.",
+    "The core workflow remains usable at 390px, 768px, and 1440px viewport widths.",
+    "Unit tests, type checking, production build, and browser smoke checks pass."
+  ],
+  "validation_steps": [
+    "Run npm test.",
+    "Run npm run build.",
+    "Verify create-edit-connect-search-export-import in a real browser.",
+    "Inspect desktop and mobile screenshots for clipping, overlap, and blank canvas output."
+  ],
+  "mvp": {
+    "must_have": [
+      "Infinite pan and zoom with selection, connections, deletion, controls, and minimap",
+      "Typed note, source, insight, and task cards",
+      "Contextual inspector for title, body, status, and tags",
+      "Versioned local autosave with starter-board recovery",
+      "Undo, redo, search, focus, native JSON, and JSON Canvas import/export",
+      "Responsive and accessible desktop/mobile interface"
+    ],
+    "should_have": [
+      "Tidy layout",
+      "Duplicate action",
+      "Edge labels",
+      "Markdown export"
+    ],
+    "later": [
+      "IndexedDB assets",
+      "Document view",
+      "WebDAV or CRDT sync",
+      "Plugin API",
+      "AI and MCP adapter",
+      "Real-time collaboration"
+    ],
+    "out_of_scope": [
+      "Freehand drawing",
+      "Image generation",
+      "Production multiplayer",
+      "Accounts and billing",
+      "General-purpose design editing"
+    ]
+  },
+  "architecture": {
+    "stack": [
+      "React 19",
+      "TypeScript",
+      "Vite",
+      "@xyflow/react",
+      "Lucide icons",
+      "CSS with OKLCH tokens",
+      "Vitest"
+    ],
+    "modules": [
+      "app-shell",
+      "canvas-surface",
+      "card-node",
+      "inspector",
+      "board-history",
+      "storage-adapter",
+      "native-format-adapter",
+      "json-canvas-adapter"
+    ],
+    "data_model": [
+      "BoardDocument owns schemaVersion, metadata, nodes, edges, viewport, and updatedAt",
+      "Application card data is independent from renderer-specific component state",
+      "Import/export adapters validate untrusted files before state replacement"
+    ],
+    "integrations": [
+      "localStorage now",
+      "JSON Canvas 1.0 now",
+      "StorageAdapter, SyncAdapter, and AgentAdapter boundaries for later versions"
+    ]
+  },
+  "directories": [
+    "src/components",
+    "src/data",
+    "src/lib",
+    "src/types",
+    "tests",
+    "docs"
+  ]
+}
