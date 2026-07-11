@@ -11,6 +11,7 @@ export const DB_VERSION = 1;
 const BOARDS_STORE = 'boards';
 const META_STORE = 'meta';
 const ACTIVE_BOARD_KEY = 'activeBoardId';
+const LAST_BACKUP_AT_KEY = 'lastBackupAt';
 
 export interface StorageAdapter {
   getItem(key: string): string | null;
@@ -32,12 +33,16 @@ export interface BoardStorage {
   getActiveBoardId(): Promise<string | null>;
   setActiveBoardId(id: string): Promise<void>;
   putBoardAndSetActive(board: BoardDocument): Promise<void>;
+  replaceWorkspace(boards: BoardDocument[], activeBoardId: string): Promise<void>;
+  getLastBackupAt(): Promise<string | null>;
+  setLastBackupAt(value: string): Promise<void>;
 }
 
 export interface BoardStorageInitialization {
   storage: BoardStorage;
   activeBoard: BoardDocument;
   boards: BoardSummary[];
+  lastBackupAt: string | null;
   warning?: string;
 }
 
@@ -72,6 +77,42 @@ function getBrowserIndexedDb(): IDBFactory | undefined {
 
 function cloneBoard(board: BoardDocument): BoardDocument {
   return parseBoardDocument(board);
+}
+
+function validateWorkspace(
+  boards: BoardDocument[],
+  activeBoardId: string,
+): BoardDocument[] {
+  if (!Array.isArray(boards)) throw new Error('Workspace boards must be an array');
+
+  const validated = boards.map((board) => parseBoardDocument(board));
+  if (validated.length === 0) throw new Error('Workspace must contain at least one board');
+
+  const boardIds = new Set<string>();
+  for (const board of validated) {
+    if (boardIds.has(board.id)) throw new Error(`Duplicate board id: ${board.id}`);
+    boardIds.add(board.id);
+  }
+
+  if (typeof activeBoardId !== 'string' || !activeBoardId.trim()) {
+    throw new Error('Active board id must be a non-empty string');
+  }
+  if (!boardIds.has(activeBoardId)) {
+    throw new Error(`Active board not found in workspace: ${activeBoardId}`);
+  }
+
+  return validated;
+}
+
+function validateBackupTimestamp(value: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error('Last backup time must be an ISO date string');
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString() !== value) {
+    throw new Error('Last backup time must be an ISO date string');
+  }
+  return value;
 }
 
 function boardSummary(board: BoardDocument): BoardSummary {
@@ -233,6 +274,50 @@ class IndexedDbBoardStorage implements BoardStorage {
     );
     await Promise.all([putBoardRequest, putActiveRequest, done]);
   }
+
+  async replaceWorkspace(
+    boards: BoardDocument[],
+    activeBoardId: string,
+  ): Promise<void> {
+    const validated = validateWorkspace(boards, activeBoardId);
+    const database = await this.database();
+    const transaction = database.transaction([BOARDS_STORE, META_STORE], 'readwrite');
+    const done = transactionDone(transaction);
+    const boardsStore = transaction.objectStore(BOARDS_STORE);
+    const metaStore = transaction.objectStore(META_STORE);
+    const requests = [
+      requestResult(boardsStore.clear()),
+      ...validated.map((board) => requestResult(boardsStore.put(board))),
+      requestResult(metaStore.put({ key: ACTIVE_BOARD_KEY, value: activeBoardId })),
+    ];
+    await Promise.all([...requests, done]);
+  }
+
+  async getLastBackupAt(): Promise<string | null> {
+    const database = await this.database();
+    const transaction = database.transaction(META_STORE, 'readonly');
+    const done = transactionDone(transaction);
+    const stored = await requestResult<MetaRecord | undefined>(
+      transaction.objectStore(META_STORE).get(LAST_BACKUP_AT_KEY),
+    );
+    await done;
+    try {
+      return typeof stored?.value === 'string' ? validateBackupTimestamp(stored.value) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async setLastBackupAt(value: string): Promise<void> {
+    const validated = validateBackupTimestamp(value);
+    const database = await this.database();
+    const transaction = database.transaction(META_STORE, 'readwrite');
+    const done = transactionDone(transaction);
+    const request = requestResult(
+      transaction.objectStore(META_STORE).put({ key: LAST_BACKUP_AT_KEY, value: validated }),
+    );
+    await Promise.all([request, done]);
+  }
 }
 
 export function createIndexedDbBoardStorage(
@@ -242,8 +327,9 @@ export function createIndexedDbBoardStorage(
 }
 
 export class MemoryBoardStorage implements BoardStorage {
-  private readonly boards = new Map<string, BoardDocument>();
+  private boards = new Map<string, BoardDocument>();
   private activeBoardId: string | null;
+  private lastBackupAt: string | null = null;
 
   constructor(initialBoards: BoardDocument[] = [], activeBoardId: string | null = null) {
     for (const board of initialBoards) {
@@ -286,6 +372,23 @@ export class MemoryBoardStorage implements BoardStorage {
     this.boards.set(validated.id, validated);
     this.activeBoardId = validated.id;
   }
+
+  async replaceWorkspace(
+    boards: BoardDocument[],
+    activeBoardId: string,
+  ): Promise<void> {
+    const validated = validateWorkspace(boards, activeBoardId);
+    this.boards = new Map(validated.map((board) => [board.id, board]));
+    this.activeBoardId = activeBoardId;
+  }
+
+  async getLastBackupAt(): Promise<string | null> {
+    return this.lastBackupAt;
+  }
+
+  async setLastBackupAt(value: string): Promise<void> {
+    this.lastBackupAt = validateBackupTimestamp(value);
+  }
 }
 
 function errorMessage(error: unknown): string {
@@ -297,10 +400,15 @@ async function initializedResult(
   activeBoard: BoardDocument,
   warning?: string,
 ): Promise<BoardStorageInitialization> {
+  const [boards, lastBackupAt] = await Promise.all([
+    storage.listBoards(),
+    storage.getLastBackupAt(),
+  ]);
   return {
     storage,
     activeBoard: parseBoardDocument(activeBoard),
-    boards: await storage.listBoards(),
+    boards,
+    lastBackupAt,
     ...(warning ? { warning } : {}),
   };
 }

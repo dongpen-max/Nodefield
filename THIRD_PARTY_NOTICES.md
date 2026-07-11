@@ -8,6 +8,8 @@ Runtime and build dependencies include:
 - React Flow (`@xyflow/react`), MIT License: https://github.com/xyflow/xyflow
 - Lucide, ISC License: https://github.com/lucide-icons/lucide
 - Vite, MIT License: https://github.com/vitejs/vite
+- Vite Plugin PWA, MIT License: https://github.com/vite-pwa/vite-plugin-pwa
+- Workbox, MIT License: https://github.com/googlechrome/workbox
 - Vitest, MIT License: https://github.com/vitest-dev/vitest
 
 Development-only test dependencies include:

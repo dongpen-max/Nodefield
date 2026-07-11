@@ -99,6 +99,28 @@ select:focus-visible {
   font-size: 13px;
 }
 
+.app-loading--waiting {
+  flex-direction: column;
+  padding: 24px;
+  text-align: center;
+}
+
+.app-loading__copy {
+  display: grid;
+  gap: 3px;
+  max-width: 340px;
+}
+
+.app-loading__copy strong {
+  color: var(--color-ink);
+  font-size: 14px;
+}
+
+.app-loading__copy span {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -560,7 +582,7 @@ select:focus-visible {
   top: 41px;
   right: 0;
   display: grid;
-  width: 224px;
+  width: 272px;
   padding: 5px;
   border: 1px solid var(--color-line);
   border-radius: 6px;
@@ -603,6 +625,73 @@ select:focus-visible {
 }
 
 .file-menu__panel button.is-danger {
+  color: var(--color-danger);
+}
+
+.storage-status {
+  display: grid;
+  gap: 8px;
+  padding: 7px 9px 8px;
+  color: var(--color-muted);
+}
+
+.storage-status > header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.storage-status > header svg {
+  flex: 0 0 auto;
+  color: var(--color-primary);
+}
+
+.storage-status > header strong {
+  color: var(--color-ink);
+  font-size: 12px;
+}
+
+.storage-status > header span {
+  overflow: hidden;
+  margin-left: auto;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage-status dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.storage-status dl > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.storage-status dt,
+.storage-status dd {
+  overflow: hidden;
+  margin: 0;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage-status dd {
+  color: var(--color-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.storage-status--warning > header,
+.storage-status--warning > header svg {
   color: var(--color-danger);
 }
 

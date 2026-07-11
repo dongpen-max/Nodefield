@@ -27,6 +27,7 @@ import CardNode from './components/CardNode';
 import EdgeInspector from './components/EdgeInspector';
 import Inspector from './components/Inspector';
 import SelectionInspector from './components/SelectionInspector';
+import type { StorageStatusData } from './components/StorageStatus';
 import Toast, { type ToastMessage } from './components/Toast';
 import ToolDock, { type CanvasMode } from './components/ToolDock';
 import TopBar from './components/TopBar';
@@ -35,6 +36,11 @@ import { createBlankBoard, createStarterBoard } from './data/starterBoard';
 import { createCardNode, duplicateNode, parseBoardDocument, tidyNodes } from './lib/board';
 import { exportJsonCanvas, importJsonCanvas } from './lib/jsonCanvas';
 import type { BoardStorage, BoardSummary } from './lib/storage';
+import {
+  createWorkspaceArchive,
+  exportWorkspaceArchive,
+  parseWorkspaceArchive,
+} from './lib/workspaceArchive';
 import {
   BOARD_SCHEMA_VERSION,
   type BoardDocument,
@@ -57,6 +63,7 @@ interface AppProps {
   initialBoards: BoardSummary[];
   storage: BoardStorage;
   persistentStorage: boolean;
+  initialLastBackupAt: string | null;
   initialWarning?: string;
 }
 
@@ -84,6 +91,11 @@ function downloadText(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
+interface StorageEstimateState {
+  usage: number | null;
+  quota: number | null;
+}
+
 function nextUntitledBoardTitle(boards: BoardSummary[]): string {
   const titles = new Set(boards.map((board) => board.title));
   if (!titles.has('未命名画布')) return '未命名画布';
@@ -98,10 +110,12 @@ export default function App({
   initialBoards,
   storage,
   persistentStorage,
+  initialLastBackupAt,
   initialWarning,
 }: AppProps) {
   const flow = useReactFlow<CanvasNode, CanvasEdge>();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const workspaceInputRef = useRef<HTMLInputElement>(null);
   const pastRef = useRef<BoardDocument[]>([]);
   const futureRef = useRef<BoardDocument[]>([]);
   const lastMergeRef = useRef<MergeState | null>(null);
@@ -118,6 +132,12 @@ export default function App({
   const [mode, setMode] = useState<CanvasMode>('select');
   const [query, setQuery] = useState('');
   const [boardActionPending, setBoardActionPending] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(initialBoard.updatedAt);
+  const [lastBackupAt, setLastBackupAt] = useState<string | null>(initialLastBackupAt);
+  const [storageEstimate, setStorageEstimate] = useState<StorageEstimateState>({
+    usage: null,
+    quota: null,
+  });
   const settledSaveState = persistentStorage ? 'saved' : 'volatile';
   const [saveState, setSaveState] = useState<'saving' | 'saved' | 'error' | 'volatile'>(
     settledSaveState,
@@ -162,6 +182,27 @@ export default function App({
   const showToast = useCallback((text: string, tone: ToastMessage['tone'] = 'success') => {
     setToast({ id: Date.now(), text, tone });
   }, []);
+
+  const refreshStorageEstimate = useCallback(async () => {
+    if (!persistentStorage || !navigator.storage?.estimate) {
+      setStorageEstimate({ usage: null, quota: null });
+      return;
+    }
+
+    try {
+      const estimate = await navigator.storage.estimate();
+      setStorageEstimate({
+        usage: typeof estimate.usage === 'number' ? estimate.usage : null,
+        quota: typeof estimate.quota === 'number' ? estimate.quota : null,
+      });
+    } catch {
+      setStorageEstimate({ usage: null, quota: null });
+    }
+  }, [persistentStorage]);
+
+  useEffect(() => {
+    void refreshStorageEstimate();
+  }, [refreshStorageEstimate]);
 
   useEffect(() => {
     if (!toast) return;
@@ -241,14 +282,18 @@ export default function App({
   const refreshBoards = useCallback(async () => {
     const nextBoards = await storage.listBoards();
     setBoards(nextBoards);
+    void refreshStorageEstimate();
     return nextBoards;
-  }, [storage]);
+  }, [refreshStorageEstimate, storage]);
 
   const persistDocument = useCallback(
     (document: BoardDocument) => {
       const operation = saveQueueRef.current
         .catch(() => undefined)
-        .then(() => storage.putBoard(document));
+        .then(async () => {
+          await storage.putBoard(document);
+          setLastSavedAt(new Date().toISOString());
+        });
       saveQueueRef.current = operation.catch(() => undefined);
       return operation;
     },
@@ -266,14 +311,14 @@ export default function App({
   }, [cancelPendingSave, currentDocument, persistDocument, refreshBoards, settledSaveState]);
 
   const runBoardAction = useCallback(
-    (action: () => Promise<void>) => {
+    (action: () => Promise<void>, failureMessage = '画布操作失败，请先导出当前文件') => {
       if (boardActionRef.current) return;
       boardActionRef.current = true;
       setBoardActionPending(true);
       void action()
         .catch(() => {
           setSaveState('error');
-          showToast('画布操作失败，请先导出当前文件', 'error');
+          showToast(failureMessage, 'error');
         })
         .finally(() => {
           boardActionRef.current = false;
@@ -721,6 +766,122 @@ export default function App({
     ],
   );
 
+  const readAllBoards = useCallback(async () => {
+    const summaries = await storage.listBoards();
+    const documents = await Promise.all(
+      summaries.map((summary) => storage.getBoard(summary.id)),
+    );
+    if (documents.some((document) => document === null)) {
+      throw new Error('A stored board could not be loaded');
+    }
+    return documents as BoardDocument[];
+  }, [storage]);
+
+  const backupWorkspace = useCallback(() => {
+    runBoardAction(async () => {
+      await flushCurrentBoard();
+      const documents = await readAllBoards();
+      const exportedAt = new Date().toISOString();
+      const archive = createWorkspaceArchive(documents, boardId, exportedAt);
+      downloadText(
+        `nodefield-workspace-${exportedAt.slice(0, 10)}.json`,
+        exportWorkspaceArchive(archive),
+      );
+
+      setLastBackupAt(exportedAt);
+      let metadataSaved = true;
+      try {
+        await storage.setLastBackupAt(exportedAt);
+      } catch {
+        metadataSaved = false;
+      }
+      void refreshStorageEstimate();
+      showToast(
+        metadataSaved
+          ? `已备份 ${documents.length} 个画布`
+          : '工作区已下载，但备份时间未能保存',
+        metadataSaved ? 'success' : 'error',
+      );
+    }, '工作区备份失败，请重试');
+  }, [
+    boardId,
+    flushCurrentBoard,
+    readAllBoards,
+    refreshStorageEstimate,
+    runBoardAction,
+    showToast,
+    storage,
+  ]);
+
+  const onWorkspaceFileChange = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+
+      try {
+        const archive = parseWorkspaceArchive(await file.text());
+        if (
+          !window.confirm(
+            `恢复“${file.name}”中的 ${archive.boards.length} 个画布？当前工作区将被替换。`,
+          )
+        ) {
+          return;
+        }
+
+        runBoardAction(async () => {
+          cancelPendingSave();
+          await saveQueueRef.current.catch(() => undefined);
+          await storage.replaceWorkspace(archive.boards, archive.activeBoardId);
+          const activeBoard = archive.boards.find(
+            (board) => board.id === archive.activeBoardId,
+          )!;
+
+          clearHistory();
+          restoreDocument(activeBoard, true);
+          setBoards(
+            archive.boards
+              .map(({ id, title, updatedAt }) => ({ id, title, updatedAt }))
+              .sort(
+                (left, right) =>
+                  Date.parse(right.updatedAt) - Date.parse(left.updatedAt) ||
+                  left.id.localeCompare(right.id),
+              ),
+          );
+          setLastSavedAt(new Date().toISOString());
+          setLastBackupAt(archive.exportedAt);
+          setSaveState(settledSaveState);
+
+          let metadataSaved = true;
+          try {
+            await storage.setLastBackupAt(archive.exportedAt);
+          } catch {
+            metadataSaved = false;
+          }
+          void refreshStorageEstimate();
+          showToast(
+            metadataSaved
+              ? `已恢复 ${archive.boards.length} 个画布`
+              : '工作区已恢复，但备份时间未能保存',
+            metadataSaved ? 'success' : 'error',
+          );
+        }, '工作区恢复失败，原有数据未被替换');
+      } catch {
+        showToast('工作区备份文件无效，未修改当前工作区', 'error');
+      }
+    },
+    [
+      cancelPendingSave,
+      clearHistory,
+      refreshStorageEstimate,
+      restoreDocument,
+      runBoardAction,
+      settledSaveState,
+      showToast,
+      storage,
+    ],
+  );
+
   const onFileChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -799,6 +960,17 @@ export default function App({
     [edges, nodeTitles],
   );
 
+  const storageStatus = useMemo<StorageStatusData>(
+    () => ({
+      persistent: persistentStorage,
+      lastSavedAt,
+      lastBackupAt,
+      usage: storageEstimate.usage,
+      quota: storageEstimate.quota,
+    }),
+    [lastBackupAt, lastSavedAt, persistentStorage, storageEstimate],
+  );
+
   return (
     <div
       className={`app-shell${hasInspector ? ' has-inspector' : ''}`}
@@ -822,6 +994,8 @@ export default function App({
           onUndo={undo}
           onRedo={redo}
           onTidy={tidy}
+          onBackupWorkspace={backupWorkspace}
+          onRestoreWorkspace={() => workspaceInputRef.current?.click()}
           onExportNative={() => {
             downloadText(
               `${fileStem(title)}.nodefield.json`,
@@ -836,6 +1010,7 @@ export default function App({
           onImport={() => fileInputRef.current?.click()}
           onReset={resetBoard}
           saveState={saveState}
+          storageStatus={storageStatus}
         />
 
         <main className="canvas-stage" onDoubleClick={onCanvasDoubleClick}>
@@ -932,6 +1107,13 @@ export default function App({
           accept=".json,.canvas,application/json"
           hidden
           onChange={onFileChange}
+        />
+        <input
+          ref={workspaceInputRef}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          onChange={onWorkspaceFileChange}
         />
       </div>
       <Toast message={toast} onDismiss={() => setToast(null)} />

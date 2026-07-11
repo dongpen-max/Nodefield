@@ -18,6 +18,27 @@ test('keeps the workspace and inspector within every target viewport', async (
   await expect(page.getByRole('navigation', { name: '画布工具' })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
+  await page.getByLabel('文件菜单').click();
+  const filePanel = page.locator('.file-menu__panel');
+  const storageStatus = page.getByLabel('本地存储状态');
+  await expect(filePanel).toBeVisible();
+  await expect(storageStatus).toContainText('IndexedDB');
+
+  const viewport = page.viewportSize();
+  const filePanelBox = await filePanel.boundingBox();
+  expect(viewport).not.toBeNull();
+  expect(filePanelBox).not.toBeNull();
+  expect(filePanelBox!.x).toBeGreaterThanOrEqual(-1);
+  expect(filePanelBox!.y).toBeGreaterThanOrEqual(-1);
+  expect(filePanelBox!.x + filePanelBox!.width).toBeLessThanOrEqual(viewport!.width + 1);
+  expect(filePanelBox!.y + filePanelBox!.height).toBeLessThanOrEqual(viewport!.height + 1);
+  await expectNoHorizontalOverflow(page);
+  await testInfo.attach(`nodefield-${testInfo.project.name}-storage.png`, {
+    body: await page.screenshot({ animations: 'disabled' }),
+    contentType: 'image/png',
+  });
+  await page.getByLabel('文件菜单').click();
+
   await page.getByRole('textbox', { name: '搜索节点' }).fill(QUESTION_TITLE);
   await page.getByRole('option', { name: new RegExp(QUESTION_TITLE) }).click();
 
@@ -73,8 +94,6 @@ test('keeps the workspace and inspector within every target viewport', async (
     await boardSelectButton(page, '手机 E2E 画布').click();
     await expect(page.getByLabel(/^切换画布，当前为手机 E2E 画布/)).toBeVisible();
   } else {
-    const viewport = page.viewportSize();
-    expect(viewport).not.toBeNull();
     expect(inspectorBox!.width).toBeGreaterThanOrEqual(319);
     expect(inspectorBox!.width).toBeLessThanOrEqual(321);
     expect(inspectorBox!.x + inspectorBox!.width).toBeGreaterThanOrEqual(

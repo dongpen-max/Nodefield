@@ -82,6 +82,80 @@ describe('board storage', () => {
     expect(await storage.getBoard(board.id)).toEqual(board);
   });
 
+  it('atomically replaces the complete workspace while preserving backup metadata', async () => {
+    const original = createBlankBoard('Original');
+    const first = createBlankBoard('First replacement');
+    first.updatedAt = '2026-07-11T10:00:00.000Z';
+    const second = createBlankBoard('Second replacement');
+    second.updatedAt = '2026-07-11T09:00:00.000Z';
+    const storage = new MemoryBoardStorage([original], original.id);
+    const lastBackupAt = '2026-07-11T08:30:00.000Z';
+    await storage.setLastBackupAt(lastBackupAt);
+
+    await storage.replaceWorkspace([first, second], second.id);
+
+    expect((await storage.listBoards()).map((board) => board.id)).toEqual([
+      first.id,
+      second.id,
+    ]);
+    expect(await storage.getBoard(original.id)).toBeNull();
+    expect(await storage.getBoard(first.id)).toEqual(first);
+    expect(await storage.getBoard(second.id)).toEqual(second);
+    expect(await storage.getActiveBoardId()).toBe(second.id);
+    expect(await storage.getLastBackupAt()).toBe(lastBackupAt);
+  });
+
+  it('does not change the workspace when replacement input is invalid', async () => {
+    const original = createBlankBoard('Original');
+    const replacement = createBlankBoard('Replacement');
+    const invalid = {
+      ...replacement,
+      schemaVersion: 99,
+    } as unknown as typeof replacement;
+    const storage = new MemoryBoardStorage([original], original.id);
+
+    const invalidReplacements: Array<[Array<typeof replacement>, string]> = [
+      [[], original.id],
+      [[replacement, replacement], replacement.id],
+      [[replacement], original.id],
+      [[replacement, invalid], replacement.id],
+    ];
+
+    for (const [boards, activeBoardId] of invalidReplacements) {
+      await expect(storage.replaceWorkspace(boards, activeBoardId)).rejects.toThrow();
+      expect(await storage.listBoards()).toEqual([
+        {
+          id: original.id,
+          title: original.title,
+          updatedAt: original.updatedAt,
+        },
+      ]);
+      expect(await storage.getActiveBoardId()).toBe(original.id);
+    }
+  });
+
+  it('round-trips and exposes the last backup time during initialization', async () => {
+    const board = createBlankBoard('Backed up');
+    const storage = new MemoryBoardStorage([board], board.id);
+    const lastBackupAt = '2026-07-11T09:45:00.000Z';
+
+    expect(await storage.getLastBackupAt()).toBeNull();
+    await storage.setLastBackupAt(lastBackupAt);
+
+    const initialized = await initializeBoardStorage(storage, new MemoryStorage());
+    expect(await storage.getLastBackupAt()).toBe(lastBackupAt);
+    expect(initialized.lastBackupAt).toBe(lastBackupAt);
+  });
+
+  it('rejects ambiguous or invalid backup timestamps', async () => {
+    const storage = new MemoryBoardStorage();
+
+    for (const value of ['2026-07-11', 'not-a-date', '2026-02-30T00:00:00.000Z']) {
+      await expect(storage.setLastBackupAt(value)).rejects.toThrow(/ISO date string/);
+      expect(await storage.getLastBackupAt()).toBeNull();
+    }
+  });
+
   it('prefers existing boards and repairs a dangling active id', async () => {
     const existing = createBlankBoard('IndexedDB board');
     const legacy = createBlankBoard('Legacy board');

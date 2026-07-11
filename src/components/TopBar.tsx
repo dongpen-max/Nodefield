@@ -2,6 +2,8 @@ import { useRef } from 'react';
 import {
   AlignHorizontalDistributeCenter,
   AlertTriangle,
+  Archive,
+  ArchiveRestore,
   Check,
   Download,
   FileInput,
@@ -17,6 +19,7 @@ import {
 import type { BoardSummary } from '../lib/storage';
 import type { CanvasNode } from '../types/board';
 import BoardSwitcher from './BoardSwitcher';
+import StorageStatus, { type StorageStatusData } from './StorageStatus';
 import { CARD_META } from './cardMeta';
 
 interface TopBarProps {
@@ -36,11 +39,14 @@ interface TopBarProps {
   onUndo: () => void;
   onRedo: () => void;
   onTidy: () => void;
+  onBackupWorkspace: () => void;
+  onRestoreWorkspace: () => void;
   onExportNative: () => void;
   onExportCanvas: () => void;
   onImport: () => void;
   onReset: () => void;
   saveState: 'saving' | 'saved' | 'error' | 'volatile';
+  storageStatus: StorageStatusData;
 }
 
 export default function TopBar({
@@ -60,11 +66,14 @@ export default function TopBar({
   onUndo,
   onRedo,
   onTidy,
+  onBackupWorkspace,
+  onRestoreWorkspace,
   onExportNative,
   onExportCanvas,
   onImport,
   onReset,
   saveState,
+  storageStatus,
 }: TopBarProps) {
   const menuRef = useRef<HTMLDetailsElement>(null);
   const closeMenu = () => menuRef.current?.removeAttribute('open');
@@ -221,12 +230,33 @@ export default function TopBar({
             <button
               type="button"
               onClick={() => {
+                onBackupWorkspace();
+                closeMenu();
+              }}
+            >
+              <Archive size={16} aria-hidden="true" />
+              备份全部画布
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onRestoreWorkspace();
+                closeMenu();
+              }}
+            >
+              <ArchiveRestore size={16} aria-hidden="true" />
+              恢复工作区
+            </button>
+            <span aria-hidden="true" />
+            <button
+              type="button"
+              onClick={() => {
                 onExportNative();
                 closeMenu();
               }}
             >
               <Download size={16} aria-hidden="true" />
-              导出 Nodefield
+              导出当前画布
             </button>
             <button
               type="button"
@@ -246,7 +276,7 @@ export default function TopBar({
               }}
             >
               <FileInput size={16} aria-hidden="true" />
-              导入文件
+              导入为新画布
             </button>
             <span aria-hidden="true" />
             <button
@@ -270,6 +300,8 @@ export default function TopBar({
               <RotateCcw size={16} aria-hidden="true" />
               恢复示例画布
             </button>
+            <span aria-hidden="true" />
+            <StorageStatus status={storageStatus} />
           </div>
         </details>
       </div>
