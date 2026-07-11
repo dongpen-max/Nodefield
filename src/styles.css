@@ -87,6 +87,38 @@ select:focus-visible {
   min-height: 100%;
 }
 
+.app-loading {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--color-surface-raised);
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.workspace-blocker {
+  position: fixed;
+  z-index: 45;
+  inset: 0;
+  cursor: progress;
+}
+
 .canvas-stage {
   position: fixed;
   inset: 56px 0 0;
@@ -160,24 +192,174 @@ select:focus-visible {
   background: var(--color-accent);
 }
 
-.board-title {
-  width: min(22vw, 250px);
+.board-switcher {
+  position: relative;
+  flex: 0 1 250px;
   min-width: 130px;
+}
+
+.board-switcher > summary {
+  display: flex;
+  width: 100%;
   height: 34px;
-  padding: 0 8px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 7px;
   overflow: hidden;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
+  cursor: pointer;
   font-size: 14px;
   font-weight: 600;
-  text-overflow: ellipsis;
+  list-style: none;
 }
 
-.board-title:hover,
-.board-title:focus {
+.board-switcher > summary::-webkit-details-marker {
+  display: none;
+}
+
+.board-switcher > summary > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-switcher > summary > svg:last-child {
+  flex: 0 0 auto;
+  color: var(--color-muted);
+  transition: transform 150ms ease-out;
+}
+
+.board-switcher > summary:hover,
+.board-switcher[open] > summary {
   border-color: var(--color-line);
   background: var(--color-surface-raised);
+}
+
+.board-switcher[open] > summary > svg:last-child {
+  transform: rotate(180deg);
+}
+
+.board-switcher__panel {
+  position: absolute;
+  z-index: var(--z-menu);
+  top: 42px;
+  left: 0;
+  display: grid;
+  width: min(320px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: var(--color-bg);
+  box-shadow: var(--shadow-control);
+}
+
+.board-switcher__panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 7px 8px 7px 12px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.board-switcher__panel > header strong {
+  font-size: 13px;
+}
+
+.board-switcher__create {
+  min-height: 32px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+.board-list {
+  display: grid;
+  max-height: min(330px, 55vh);
+  overflow: auto;
+  padding: 5px;
+}
+
+.board-list__row {
+  display: flex;
+  min-width: 0;
+  align-items: stretch;
+  border-radius: 4px;
+}
+
+.board-list__row:hover,
+.board-list__row.is-active {
+  background: var(--color-surface);
+}
+
+.board-list__row.is-active {
+  color: var(--color-primary);
+}
+
+.board-list__select {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.board-list__select > span {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.board-list__select strong {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-list__select small {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.board-list__delete {
+  display: grid;
+  width: 36px;
+  flex: 0 0 36px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-subtle);
+  opacity: 0;
+}
+
+.board-list__row:hover .board-list__delete,
+.board-list__delete:focus-visible {
+  opacity: 1;
+}
+
+.board-list__delete:hover {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.board-switcher__rename {
+  padding: 11px 12px 12px;
+  border-top: 1px solid var(--color-line);
 }
 
 .search-control {
@@ -316,6 +498,13 @@ select:focus-visible {
   color: var(--color-primary);
 }
 
+.save-indicator--error,
+.save-indicator--error svg,
+.save-indicator--volatile,
+.save-indicator--volatile svg {
+  color: var(--color-danger);
+}
+
 .top-bar__actions {
   display: flex;
   flex: 0 0 auto;
@@ -395,6 +584,16 @@ select:focus-visible {
 
 .file-menu__panel button:hover {
   background: var(--color-surface);
+}
+
+.file-menu__panel button:disabled {
+  background: transparent;
+  color: var(--color-line-strong);
+  cursor: default;
+}
+
+.mobile-menu-action {
+  display: none !important;
 }
 
 .file-menu__panel > span {
@@ -652,6 +851,17 @@ select:focus-visible {
   stroke-width: 2;
 }
 
+.react-flow__edge-text {
+  fill: var(--color-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.react-flow__edge-textbg {
+  fill: var(--color-bg);
+  fill-opacity: 0.92;
+}
+
 .react-flow__connection-path {
   stroke: var(--color-primary);
   stroke-width: 2;
@@ -755,6 +965,53 @@ select:focus-visible {
   gap: 18px;
   overflow: auto;
   padding: 16px;
+}
+
+.edge-endpoints {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 9px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.edge-endpoints span {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edge-endpoints span:last-child {
+  text-align: right;
+}
+
+.selection-summary {
+  display: flex;
+  gap: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.selection-summary span {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.selection-summary strong {
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 650;
 }
 
 .field-group {
@@ -951,13 +1208,17 @@ select:focus-visible {
     display: none;
   }
 
-  .board-title {
-    width: 180px;
+  .board-switcher {
+    flex-basis: 180px;
     min-width: 100px;
   }
 
   .search-control {
     flex-basis: 220px;
+  }
+
+  .app-shell.has-inspector .canvas-stage {
+    right: 0;
   }
 
   .inspector {
@@ -985,27 +1246,54 @@ select:focus-visible {
     height: 28px;
   }
 
-  .board-title {
-    width: 116px;
+  .board-switcher {
+    flex-basis: 116px;
     min-width: 80px;
+  }
+
+  .board-switcher > summary {
     padding: 0 5px;
     font-size: 13px;
+  }
+
+  .board-list__delete {
+    width: 42px;
+    flex-basis: 42px;
+    opacity: 1;
   }
 
   .search-control {
     flex-basis: 150px;
     min-width: 120px;
+    height: 40px;
   }
 
-  .save-indicator,
+  .save-indicator:not(.save-indicator--error):not(.save-indicator--volatile),
   .desktop-action {
     display: none;
   }
 
+  .board-switcher > summary {
+    height: 42px;
+  }
+
+  .board-switcher__create {
+    min-height: 42px;
+  }
+
   .icon-button,
   .file-menu > summary {
-    width: 36px;
-    height: 36px;
+    width: 42px;
+    height: 42px;
+  }
+
+  .file-menu__panel button,
+  .secondary-button,
+  .danger-button,
+  .field-group input,
+  .field-group select,
+  .type-segments button {
+    min-height: 40px;
   }
 
   [data-tooltip]::after {
@@ -1110,8 +1398,16 @@ select:focus-visible {
     display: none;
   }
 
-  .board-title {
-    width: 104px;
+  .board-switcher {
+    flex-basis: 108px;
+  }
+
+  .board-switcher__panel {
+    position: fixed;
+    top: 52px;
+    right: 6px;
+    left: 6px;
+    width: auto;
   }
 
   .search-control {
@@ -1124,17 +1420,25 @@ select:focus-visible {
   }
 
   .top-bar__actions {
-    flex: 0 0 36px;
+    flex: 0 0 42px;
   }
 
   .file-menu__panel {
     position: fixed;
-    top: 48px;
+    top: 52px;
     right: 6px;
   }
 
+  .mobile-menu-action {
+    display: flex !important;
+  }
+
+  .file-menu__panel > span.mobile-menu-action {
+    display: block !important;
+  }
+
   .tool-dock button {
-    width: 40px;
+    width: 42px;
   }
 
   .inspector__body {

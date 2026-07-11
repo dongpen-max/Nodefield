@@ -8,6 +8,9 @@ export type CardKind = (typeof CARD_KINDS)[number];
 export const TASK_STATUSES = ['todo', 'doing', 'done'] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
+export const EDGE_PATHS = ['smoothstep', 'default', 'straight', 'step', 'simplebezier'] as const;
+export type EdgePath = (typeof EDGE_PATHS)[number];
+
 export interface CardData extends Record<string, unknown> {
   kind: CardKind;
   title: string;

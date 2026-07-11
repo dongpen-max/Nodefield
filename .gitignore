@@ -4,4 +4,5 @@ node_modules/
 dist/
 build/
 .playwright-cli/
-output/playwright/*.png
+output/playwright/*
+!output/playwright/.gitkeep

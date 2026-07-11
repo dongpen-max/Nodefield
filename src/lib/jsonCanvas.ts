@@ -71,6 +71,9 @@ interface JsonCanvasEdge {
   toEnd?: JsonCanvasEnd;
   color?: string;
   label?: string;
+  nodefield?: {
+    type?: string;
+  };
 }
 
 interface JsonCanvasDocument {
@@ -187,6 +190,7 @@ export function exportJsonCanvas(board: BoardDocument): string {
       fromEnd: 'none',
       toEnd: 'arrow',
       ...(typeof edge.label === 'string' ? { label: edge.label } : {}),
+      ...(edge.type ? { nodefield: { type: edge.type } } : {}),
     })),
     nodefield: {
       schemaVersion: BOARD_SCHEMA_VERSION,
@@ -340,12 +344,21 @@ function readCanvasEdge(value: unknown, index: number): BoardDocument['edges'][n
     return invalid(`${path}.toEnd`, 'expected none or arrow');
   }
 
+  let edgeType: string | undefined;
+  if (value.nodefield !== undefined) {
+    if (!isRecord(value.nodefield)) return invalid(`${path}.nodefield`, 'expected an object');
+    if (value.nodefield.type !== undefined) {
+      edgeType = stringAt(value.nodefield.type, `${path}.nodefield.type`, true);
+    }
+  }
+
   const reverse = value.fromEnd === 'arrow' && value.toEnd !== 'arrow';
   return {
     id: stringAt(value.id, `${path}.id`, true),
     source: reverse ? toNode : fromNode,
     target: reverse ? fromNode : toNode,
     ...(value.label === undefined ? {} : { label: stringAt(value.label, `${path}.label`) }),
+    ...(edgeType ? { type: edgeType } : {}),
   };
 }
 

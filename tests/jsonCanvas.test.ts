@@ -15,6 +15,12 @@ describe('JSON Canvas 1.0 adapter', () => {
     expect(imported.nodes[3].data.status).toBe('todo');
     expect(imported.nodes[1].data.url).toBe('https://jsoncanvas.org/');
     expect(imported.edges).toHaveLength(board.edges.length);
+    expect(imported.edges.map((edge) => edge.label)).toEqual(
+      board.edges.map((edge) => edge.label),
+    );
+    expect(imported.edges.map((edge) => edge.type)).toEqual(
+      board.edges.map((edge) => edge.type),
+    );
   });
 
   it('imports standard text, link, file, and group nodes', () => {

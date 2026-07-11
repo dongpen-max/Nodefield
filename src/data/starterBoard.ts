@@ -4,6 +4,18 @@ function createBoardId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `board-${Date.now().toString(36)}`;
 }
 
+export function createBlankBoard(title = '未命名画布'): BoardDocument {
+  return {
+    schemaVersion: BOARD_SCHEMA_VERSION,
+    id: createBoardId(),
+    title,
+    nodes: [],
+    edges: [],
+    viewport: { x: 0, y: 0, zoom: 1 },
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 function starterNodes(): CanvasNode[] {
   return [
     {

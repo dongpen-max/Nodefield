@@ -32,6 +32,23 @@ describe('board domain', () => {
     expect(() => parseBoardDocument(dangling)).toThrow(/unknown node id/);
   });
 
+  it('preserves editable labels and legacy custom edge types', () => {
+    const board = createStarterBoard();
+    board.edges[0] = {
+      ...board.edges[0],
+      label: '直接支持',
+      type: 'straight',
+    };
+
+    expect(parseBoardDocument(board).edges[0]).toMatchObject({
+      label: '直接支持',
+      type: 'straight',
+    });
+
+    board.edges[0].type = 'legacy-custom-edge';
+    expect(parseBoardDocument(board).edges[0].type).toBe('legacy-custom-edge');
+  });
+
   it('places dependencies in later topology columns', () => {
     const board = createStarterBoard();
     const laidOut = tidyNodes(board.nodes, board.edges);

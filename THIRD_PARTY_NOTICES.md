@@ -10,6 +10,14 @@ Runtime and build dependencies include:
 - Vite, MIT License: https://github.com/vitejs/vite
 - Vitest, MIT License: https://github.com/vitest-dev/vitest
 
+Development-only test dependencies include:
+
+- Playwright Test (`@playwright/test`), Apache License 2.0: https://github.com/microsoft/playwright
+
+Playwright and its downloaded browser binaries are used only for automated testing and are not
+included in the Nodefield runtime or production bundle. Browser distributions retain the notices
+and licenses shipped by their respective projects.
+
 Research-only references with additional restrictions are not dependencies:
 
 - tldraw uses a custom license that requires authorization for production SDK use.

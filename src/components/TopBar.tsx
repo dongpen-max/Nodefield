@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import {
   AlignHorizontalDistributeCenter,
+  AlertTriangle,
   Check,
   Download,
   FileInput,
@@ -13,12 +14,19 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
+import type { BoardSummary } from '../lib/storage';
 import type { CanvasNode } from '../types/board';
+import BoardSwitcher from './BoardSwitcher';
 import { CARD_META } from './cardMeta';
 
 interface TopBarProps {
+  boards: BoardSummary[];
+  activeBoardId: string;
   title: string;
   onTitleChange: (title: string) => void;
+  onCreateBoard: () => void;
+  onSelectBoard: (boardId: string) => void;
+  onDeleteBoard: (boardId: string) => void;
   query: string;
   onQueryChange: (query: string) => void;
   searchResults: CanvasNode[];
@@ -32,12 +40,17 @@ interface TopBarProps {
   onExportCanvas: () => void;
   onImport: () => void;
   onReset: () => void;
-  saveState: 'saving' | 'saved';
+  saveState: 'saving' | 'saved' | 'error' | 'volatile';
 }
 
 export default function TopBar({
+  boards,
+  activeBoardId,
   title,
   onTitleChange,
+  onCreateBoard,
+  onSelectBoard,
+  onDeleteBoard,
   query,
   onQueryChange,
   searchResults,
@@ -55,6 +68,14 @@ export default function TopBar({
 }: TopBarProps) {
   const menuRef = useRef<HTMLDetailsElement>(null);
   const closeMenu = () => menuRef.current?.removeAttribute('open');
+  const saveLabel =
+    saveState === 'saved'
+      ? '已保存'
+      : saveState === 'saving'
+        ? '保存中'
+        : saveState === 'volatile'
+          ? '仅此页面，刷新会丢失'
+          : '保存失败';
 
   return (
     <header className="top-bar">
@@ -67,12 +88,14 @@ export default function TopBar({
         <strong>Nodefield</strong>
       </div>
 
-      <input
-        className="board-title"
-        aria-label="画布名称"
-        value={title}
-        maxLength={80}
-        onChange={(event) => onTitleChange(event.target.value)}
+      <BoardSwitcher
+        boards={boards}
+        activeBoardId={activeBoardId}
+        title={title}
+        onTitleChange={onTitleChange}
+        onCreate={onCreateBoard}
+        onSelect={onSelectBoard}
+        onDelete={onDeleteBoard}
       />
 
       <div className="search-control">
@@ -119,9 +142,20 @@ export default function TopBar({
         ) : null}
       </div>
 
-      <div className="save-indicator" aria-live="polite">
-        {saveState === 'saved' ? <Check size={13} aria-hidden="true" /> : <HardDrive size={13} />}
-        <span>{saveState === 'saved' ? '已保存' : '保存中'}</span>
+      <div
+        className={`save-indicator save-indicator--${saveState}`}
+        data-testid="save-status"
+        data-state={saveState}
+        aria-label={saveLabel}
+        aria-live="polite"
+        title={saveState === 'volatile' ? saveLabel : undefined}
+      >
+        {saveState === 'saved' ? <Check size={13} aria-hidden="true" /> : null}
+        {saveState === 'saving' ? <HardDrive size={13} aria-hidden="true" /> : null}
+        {saveState === 'error' || saveState === 'volatile' ? (
+          <AlertTriangle size={13} aria-hidden="true" />
+        ) : null}
+        <span>{saveState === 'volatile' ? '仅此页面' : saveLabel}</span>
       </div>
 
       <div className="top-bar__actions">
@@ -159,6 +193,31 @@ export default function TopBar({
             <MoreHorizontal size={18} aria-hidden="true" />
           </summary>
           <div className="file-menu__panel">
+            <button
+              className="mobile-menu-action"
+              type="button"
+              disabled={!canUndo}
+              onClick={() => {
+                onUndo();
+                closeMenu();
+              }}
+            >
+              <Undo2 size={16} aria-hidden="true" />
+              撤销
+            </button>
+            <button
+              className="mobile-menu-action"
+              type="button"
+              disabled={!canRedo}
+              onClick={() => {
+                onRedo();
+                closeMenu();
+              }}
+            >
+              <Redo2 size={16} aria-hidden="true" />
+              重做
+            </button>
+            <span className="mobile-menu-action" aria-hidden="true" />
             <button
               type="button"
               onClick={() => {
