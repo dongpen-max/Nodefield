@@ -63,6 +63,20 @@ test('keeps the workspace and inspector within every target viewport', async (
       inspectorBox!.y + 1,
     );
     await expect(page.getByRole('navigation', { name: '画布工具' })).toBeHidden();
+    const handleBoxes = await page
+      .getByLabel(`笔记：${QUESTION_TITLE}`)
+      .locator('.canvas-card__handle')
+      .evaluateAll((handles) =>
+        handles.map((handle) => {
+          const box = handle.getBoundingClientRect();
+          return { width: box.width, height: box.height };
+        }),
+      );
+    expect(handleBoxes).toHaveLength(2);
+    for (const box of handleBoxes) {
+      expect(box.width).toBeGreaterThanOrEqual(40);
+      expect(box.height).toBeGreaterThanOrEqual(40);
+    }
     await testInfo.attach('nodefield-390x844-inspector.png', {
       body: await page.screenshot({ animations: 'disabled' }),
       contentType: 'image/png',
@@ -110,6 +124,26 @@ test('keeps the workspace and inspector within every target viewport', async (
     body: await page.screenshot({ animations: 'disabled' }),
     contentType: 'image/png',
   });
+});
+
+test('guides first-card creation within every target viewport', async ({ page }, testInfo) => {
+  await openApp(page);
+  await openBoardSwitcher(page);
+  await page.getByRole('button', { name: '新建画布' }).click();
+
+  const guide = page.getByLabel('空画布引导');
+  await expect(guide).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await testInfo.attach(`nodefield-${testInfo.project.name}-empty-canvas.png`, {
+    body: await page.screenshot({ animations: 'disabled' }),
+    contentType: 'image/png',
+  });
+
+  await guide.getByRole('button', { name: '添加第一张笔记' }).click();
+  await expect(guide).toHaveCount(0);
+  await expect(page.getByLabel('节点检查器')).toBeVisible();
+  await expect(page.getByLabel('笔记：未命名笔记')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
 });
 
 async function expectNoHorizontalOverflow(page: import('@playwright/test').Page): Promise<void> {

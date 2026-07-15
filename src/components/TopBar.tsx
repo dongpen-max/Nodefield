@@ -20,6 +20,7 @@ import type { BoardSummary } from '../lib/storage';
 import type { CanvasNode } from '../types/board';
 import BoardSwitcher from './BoardSwitcher';
 import StorageStatus, { type StorageStatusData } from './StorageStatus';
+import { useDismissableDetails } from './useDismissableDetails';
 import { CARD_META } from './cardMeta';
 
 interface TopBarProps {
@@ -76,6 +77,7 @@ export default function TopBar({
   storageStatus,
 }: TopBarProps) {
   const menuRef = useRef<HTMLDetailsElement>(null);
+  useDismissableDetails(menuRef);
   const closeMenu = () => menuRef.current?.removeAttribute('open');
   const saveLabel =
     saveState === 'saved'

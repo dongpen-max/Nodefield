@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ChangeEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
@@ -24,6 +25,7 @@ import {
   type Viewport,
 } from '@xyflow/react';
 import CardNode from './components/CardNode';
+import CanvasEmptyState from './components/CanvasEmptyState';
 import EdgeInspector from './components/EdgeInspector';
 import Inspector from './components/Inspector';
 import SelectionInspector from './components/SelectionInspector';
@@ -52,6 +54,21 @@ import {
 
 const nodeTypes = { card: CardNode };
 const HISTORY_LIMIT = 50;
+const VISIBLE_RENDER_THRESHOLD = 150;
+const CONNECTION_LINE_STYLE: CSSProperties = {
+  stroke: 'oklch(0.4 0.106 150)',
+  strokeWidth: 2,
+};
+const DEFAULT_EDGE_OPTIONS = {
+  type: 'smoothstep',
+  markerEnd: {
+    type: MarkerType.ArrowClosed,
+    width: 16,
+    height: 16,
+    color: 'oklch(0.4 0.106 150)',
+  },
+};
+const FIT_VIEW_OPTIONS = { padding: 0.18, maxZoom: 1.15 };
 
 interface MergeState {
   key: string;
@@ -103,6 +120,30 @@ function nextUntitledBoardTitle(boards: BoardSummary[]): string {
   let suffix = 2;
   while (titles.has(`未命名画布 ${suffix}`)) suffix += 1;
   return `未命名画布 ${suffix}`;
+}
+
+function sortBoardSummaries(boards: BoardSummary[]): BoardSummary[] {
+  return [...boards].sort(
+    (left, right) =>
+      Date.parse(right.updatedAt) - Date.parse(left.updatedAt) ||
+      left.id.localeCompare(right.id),
+  );
+}
+
+function useNodeTitles(nodes: CanvasNode[]): Map<string, string> {
+  const titlesRef = useRef(new Map<string, string>());
+  const current = titlesRef.current;
+  const changed =
+    current.size !== nodes.length ||
+    nodes.some((node) => current.get(node.id) !== (node.data.title || '未命名'));
+
+  if (changed) {
+    titlesRef.current = new Map(
+      nodes.map((node) => [node.id, node.data.title || '未命名']),
+    );
+  }
+
+  return titlesRef.current;
 }
 
 export default function App({
@@ -286,18 +327,37 @@ export default function App({
     return nextBoards;
   }, [refreshStorageEstimate, storage]);
 
+  const updateBoardSummary = useCallback(
+    (document: BoardDocument) => {
+      const summary: BoardSummary = {
+        id: document.id,
+        title: document.title,
+        updatedAt: document.updatedAt,
+      };
+      setBoards((current) =>
+        sortBoardSummaries([
+          ...current.filter((board) => board.id !== document.id),
+          summary,
+        ]),
+      );
+      void refreshStorageEstimate();
+    },
+    [refreshStorageEstimate],
+  );
+
   const persistDocument = useCallback(
     (document: BoardDocument) => {
       const operation = saveQueueRef.current
         .catch(() => undefined)
         .then(async () => {
           await storage.putBoard(document);
-          setLastSavedAt(new Date().toISOString());
+          setLastSavedAt(document.updatedAt);
+          updateBoardSummary(document);
         });
       saveQueueRef.current = operation.catch(() => undefined);
       return operation;
     },
-    [storage],
+    [storage, updateBoardSummary],
   );
 
   const flushCurrentBoard = useCallback(async () => {
@@ -305,10 +365,9 @@ export default function App({
     const document = currentDocument();
     setSaveState('saving');
     await persistDocument(document);
-    await refreshBoards();
     if (activeBoardIdRef.current === document.id) setSaveState(settledSaveState);
     return document;
-  }, [cancelPendingSave, currentDocument, persistDocument, refreshBoards, settledSaveState]);
+  }, [cancelPendingSave, currentDocument, persistDocument, settledSaveState]);
 
   const runBoardAction = useCallback(
     (action: () => Promise<void>, failureMessage = '画布操作失败，请先导出当前文件') => {
@@ -330,12 +389,11 @@ export default function App({
 
   useEffect(() => {
     setSaveState('saving');
-    const document = currentDocument();
     saveTimerRef.current = window.setTimeout(() => {
       saveTimerRef.current = null;
+      const document = currentDocument();
       void persistDocument(document)
-        .then(async () => {
-          await refreshBoards();
+        .then(() => {
           if (activeBoardIdRef.current === document.id) setSaveState(settledSaveState);
         })
         .catch(() => {
@@ -348,7 +406,6 @@ export default function App({
     cancelPendingSave,
     currentDocument,
     persistDocument,
-    refreshBoards,
     settledSaveState,
     showToast,
   ]);
@@ -944,10 +1001,7 @@ export default function App({
     [addNode],
   );
 
-  const nodeTitles = useMemo(
-    () => new Map(nodes.map((node) => [node.id, node.data.title || '未命名'])),
-    [nodes],
-  );
+  const nodeTitles = useNodeTitles(nodes);
 
   const renderedEdges = useMemo(
     () =>
@@ -1030,21 +1084,16 @@ export default function App({
             selectionOnDrag={mode === 'select'}
             nodesDraggable={mode === 'select'}
             elementsSelectable
+            onlyRenderVisibleElements={
+              nodes.length + renderedEdges.length > VISIBLE_RENDER_THRESHOLD
+            }
             zoomOnDoubleClick={false}
             deleteKeyCode={null}
             multiSelectionKeyCode="Shift"
             panActivationKeyCode="Space"
-            connectionLineStyle={{ stroke: 'oklch(0.4 0.106 150)', strokeWidth: 2 }}
-            defaultEdgeOptions={{
-              type: 'smoothstep',
-              markerEnd: {
-                type: MarkerType.ArrowClosed,
-                width: 16,
-                height: 16,
-                color: 'oklch(0.4 0.106 150)',
-              },
-            }}
-            fitViewOptions={{ padding: 0.18, maxZoom: 1.15 }}
+            connectionLineStyle={CONNECTION_LINE_STYLE}
+            defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
+            fitViewOptions={FIT_VIEW_OPTIONS}
           >
             <Background
               variant={BackgroundVariant.Dots}
@@ -1064,6 +1113,10 @@ export default function App({
             />
             <Controls position="bottom-right" showInteractive={false} />
           </ReactFlow>
+
+          {nodes.length === 0 ? (
+            <CanvasEmptyState onCreateNote={() => addNode('note')} />
+          ) : null}
 
           <ToolDock mode={mode} onModeChange={setMode} onAdd={addNode} />
         </main>

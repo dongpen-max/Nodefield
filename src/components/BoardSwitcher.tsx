@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { Check, ChevronDown, Layers3, Plus, Trash2 } from 'lucide-react';
 import type { BoardSummary } from '../lib/storage';
+import { useDismissableDetails } from './useDismissableDetails';
 
 interface BoardSwitcherProps {
   boards: BoardSummary[];
@@ -34,6 +35,7 @@ export default function BoardSwitcher({
   onDelete,
 }: BoardSwitcherProps) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
+  useDismissableDetails(detailsRef);
   const close = () => detailsRef.current?.removeAttribute('open');
 
   return (

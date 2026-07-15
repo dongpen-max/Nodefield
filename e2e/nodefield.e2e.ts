@@ -125,6 +125,27 @@ test('keeps volatile fallback storage visible after the startup warning closes',
   await expect(status).toHaveAttribute('data-state', 'volatile');
 });
 
+test('dismisses both workspace menus with Escape and outside interaction', async ({ page }) => {
+  await openApp(page);
+  await page.getByLabel(`笔记：${QUESTION_TITLE}`).click();
+  await expect(page.getByLabel('节点检查器')).toBeVisible();
+
+  const fileMenu = page.locator('.file-menu');
+  const fileMenuButton = page.getByLabel('文件菜单');
+  await fileMenuButton.click();
+  await expect(fileMenu).toHaveAttribute('open', '');
+  await page.keyboard.press('Escape');
+  await expect(fileMenu).not.toHaveAttribute('open', '');
+  await expect(fileMenuButton).toBeFocused();
+  await expect(page.getByLabel('节点检查器')).toBeVisible();
+
+  const boardSwitcher = page.locator('.board-switcher');
+  await page.getByLabel(/^切换画布，当前为/).click();
+  await expect(boardSwitcher).toHaveAttribute('open', '');
+  await page.getByRole('textbox', { name: '搜索节点' }).click();
+  await expect(boardSwitcher).not.toHaveAttribute('open', '');
+});
+
 test('edits an edge label and path with undo, redo, and reload persistence', async ({ page }) => {
   const edgeLabel = 'E2E 证据支撑';
 

@@ -148,6 +148,68 @@ select:focus-visible {
   transition: right 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.canvas-empty {
+  position: absolute;
+  z-index: var(--z-canvas-controls);
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  place-items: center;
+  pointer-events: none;
+  text-align: center;
+}
+
+.canvas-empty > div {
+  display: grid;
+  max-width: 380px;
+  justify-items: center;
+  gap: 8px;
+}
+
+.canvas-empty strong {
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.canvas-empty p {
+  max-width: 38ch;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.canvas-empty button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  padding: 0 12px;
+  border: 1px solid var(--color-primary);
+  border-radius: 6px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: auto;
+}
+
+.canvas-empty button:hover {
+  border-color: var(--color-primary-hover);
+  background: var(--color-primary-hover);
+}
+
+.canvas-empty small {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.canvas-empty__mobile-hint {
+  display: none;
+}
+
 .app-shell.has-inspector .canvas-stage {
   right: 320px;
 }
@@ -925,6 +987,31 @@ select:focus-visible {
   transform: scale(1.25);
 }
 
+@media (pointer: coarse) {
+  .canvas-card__handle {
+    display: grid !important;
+    width: 56px !important;
+    height: 56px !important;
+    place-items: center;
+    border: 0 !important;
+    background: transparent !important;
+    pointer-events: none;
+  }
+
+  .canvas-card__handle::after {
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--color-bg);
+    border-radius: 50%;
+    background: var(--color-primary);
+    content: '';
+  }
+
+  .canvas-card.is-selected .canvas-card__handle {
+    pointer-events: auto;
+  }
+}
+
 .react-flow__node:focus-visible .canvas-card {
   outline: 2px solid var(--color-focus);
   outline-offset: 3px;
@@ -1324,6 +1411,22 @@ select:focus-visible {
 
   .canvas-stage {
     inset: 52px 0 0;
+  }
+
+  .canvas-empty {
+    padding-bottom: 84px;
+  }
+
+  .canvas-empty button {
+    min-height: 42px;
+  }
+
+  .canvas-empty__desktop-hint {
+    display: none;
+  }
+
+  .canvas-empty__mobile-hint {
+    display: inline;
   }
 
   .app-shell.has-inspector .canvas-stage {
